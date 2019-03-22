@@ -1,0 +1,116 @@
+package main
+
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/ipfans/echo-session"
+	"github.com/labstack/echo"
+)
+
+func main() {
+	e := echo.New()
+	store, _ := session.NewRedisStore(32, "tcp", "localhost:6379", "", []byte("secret")) // set redis store
+	opts := session.Options{
+		MaxAge:   300, // in seconds
+		Secure:   false,
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+	}
+	store.Options(opts)
+
+	e.Use(session.Sessions("GSESSION", store))
+
+	// e.GET("/login", func(c echo.Context) error {
+	// 	username := c.QueryParam("username")
+	// 	userId := c.QueryParam("userId")
+
+	// 	if username != "" && userId != "" {
+	// 		fmt.Println("login success")
+	// 		session, _ := store.Get(c.Request(), "EDOC_SESSION") // get session object
+	// 		session.Values["username"] = username                // set session value
+	// 		session.Values["userId"] = userId                    // set session value
+	// 		session.Save(c.Request(), c.Response())              // save session
+	// 		return c.JSON(200, map[string]interface{}{
+	// 			"msg":       "Login success",
+	// 			"sessionId": session.ID,
+	// 		})
+	// 	}
+
+	// 	fmt.Println("login failed")
+	// 	return c.JSON(401, map[string]interface{}{
+	// 		"msg": "Unauthorized",
+	// 	})
+	// })
+
+	// e.GET("/profile", func(c echo.Context) error {
+	// 	session, _ := store.Get(c.Request(), "EDOC_SESSION") // get session object
+
+	// 	if session.IsNew {
+	// 		fmt.Println("get profile failed")
+	// 		return c.JSON(400, map[string]interface{}{
+	// 			"msg": "Bad Request",
+	// 		})
+	// 	}
+
+	// 	username := session.Values["username"]  // get session value
+	// 	userId := session.Values["userId"]      // get session value
+	// 	session.Save(c.Request(), c.Response()) // reset TTL
+
+	// 	fmt.Println("get profile success")
+	// 	return c.JSON(200, map[string]interface{}{
+	// 		"username":  username,
+	// 		"userId":    userId,
+	// 		"sessionId": session.ID,
+	// 	})
+	// })
+
+	e.GET("/login", func(c echo.Context) error {
+		username := c.QueryParam("username")
+		userId := c.QueryParam("userId")
+
+		if username != "" && userId != "" {
+			fmt.Println("login success")
+
+			session := session.Default(c)
+			session.Set("username", username)
+			session.Set("userId", userId)
+			fmt.Println("ID before save => ", session.GetID())
+			session.Save()
+			fmt.Println("ID after save => ", session.GetID())
+			return c.JSON(200, map[string]interface{}{
+				"msg": "Login success",
+				// "sessionId": session.ID,
+			})
+		}
+
+		fmt.Println("login failed")
+		return c.JSON(401, map[string]interface{}{
+			"msg": "Unauthorized",
+		})
+	})
+
+	e.GET("/profile", func(c echo.Context) error {
+		session := session.Default(c)
+		username := session.Get("username")
+		if username == nil {
+			fmt.Println("get profile failed")
+			return c.JSON(400, map[string]interface{}{
+				"msg": "Bad Request",
+			})
+		}
+
+		username = session.Get("username")
+		userId := session.Get("userId")
+		// session.Set("userId", userId)
+		session.Save()
+
+		fmt.Println("get profile success")
+		return c.JSON(200, map[string]interface{}{
+			"username": username,
+			"userId":   userId,
+		})
+	})
+
+	e.Logger.Fatal(e.Start(":8082"))
+}
